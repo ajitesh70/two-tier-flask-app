@@ -1,13 +1,36 @@
 apiVersion: v1
 kind: Service
 metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","kind":"Service","metadata":{"annotations":{},"name":"two-tier-app-service","namespace":"default"},"spec":{"ports":[{"port":80,"protocol":"TCP","targetPort":5000}],"selector":{"app":"two-tier-app"},"type":"LoadBalancer"}}
+  creationTimestamp: "2025-11-16T12:57:40Z"
+  finalizers:
+  - service.kubernetes.io/load-balancer-cleanup
   name: two-tier-app-service
+  namespace: default
+  resourceVersion: "19873"
+  uid: 9005648f-c983-4d9d-a8b3-dda407b3f43a
 spec:
+  allocateLoadBalancerNodePorts: true
+  clusterIP: 172.20.219.48
+  clusterIPs:
+  - 172.20.219.48
+  externalTrafficPolicy: Cluster
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - nodePort: 30466
+    port: 80
+    protocol: TCP
+    targetPort: 5000
   selector:
     app: two-tier-app
+  sessionAffinity: None
   type: LoadBalancer
-  ports:
-    - protocol: TCP
-      port: 80
-      targetPort: 5000
-    
+status:
+  loadBalancer:
+    ingress:
+    - hostname: a9005648fc9834d9da8b3dda407b3f43-1530201628.ap-south-1.elb.amazonaws.com
