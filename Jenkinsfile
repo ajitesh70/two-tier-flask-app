@@ -5,7 +5,8 @@ pipeline {
         AWS_REGION = "ap-south-1"
         AWS_ACCOUNT = "883391054308"
         REPO_NAME = "two-tier-flask-app"
-        ECR_REPO = "${AWS_ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com/${REPO_NAME}"
+        ECR_REGISTRY = "${AWS_ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+        ECR_REPO = "${ECR_REGISTRY}/${REPO_NAME}"
         CLUSTER = "devops-eks-demo"
         DEPLOYMENT = "two-tier-app"
     }
@@ -30,7 +31,7 @@ pipeline {
             steps {
                 sh '''
                 aws ecr get-login-password --region $AWS_REGION | \
-                docker login --username AWS --password-stdin $ECR_REPO
+                docker login --username AWS --password-stdin $ECR_REGISTRY
                 '''
             }
         }
@@ -62,7 +63,6 @@ pipeline {
 
                 IMAGE_TAG=$(cat image.txt)
 
-                # update deployment image
                 kubectl set image deployment/$DEPLOYMENT \
                 two-tier-app=$ECR_REPO:$IMAGE_TAG --record
 
