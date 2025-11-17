@@ -14,18 +14,29 @@ spec:
       labels:
         app: two-tier-app
     spec:
+      initContainers:
+        - name: wait-for-mysql
+          image: busybox
+          command: ['sh', '-c', "until nc -z mysql 3306; do echo waiting for mysql; sleep 2; done"]
+
       containers:
         - name: two-tier-app
           image: trainwithshubham/flaskapp:latest
           env:
             - name: MYSQL_HOST
-              value: "10.98.19.211"          # this is your mysql's service clusture IP, Make sure to change it with yours
+              value: "mysql"
+            - name: MYSQL_USER
+              value: "admin"
             - name: MYSQL_PASSWORD
               value: "admin"
-            - name: MYSQL_USER
-              value: "root"
             - name: MYSQL_DB
               value: "mydb"
           ports:
             - containerPort: 5000
           imagePullPolicy: Always
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 5
