@@ -2,19 +2,20 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION = "ap-south-1"
-        AWS_ACCOUNT = "883391054308"
-        REPO_NAME = "two-tier-flask-app"
-        ECR_REPO = "${AWS_ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com/${REPO_NAME}"
-        CLUSTER = "my-eks"     // FIXED CLUSTER NAME
-        DEPLOYMENT = "two-tier-app"
+        AWS_REGION   = "ap-south-1"
+        AWS_ACCOUNT  = "883391054308"
+        REPO_NAME    = "two-tier-flask-app"
+        ECR_REPO     = "${AWS_ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com/${REPO_NAME}"
+        CLUSTER      = "my-eks"
+        DEPLOYMENT   = "two-tier-app"
     }
 
     stages {
 
         stage('Checkout Code') {
             steps {
-                git branch: 'master', 
+                git branch: 'master',
+                    credentialsId: 'github-creds',
                     url: 'https://github.com/ajitesh70/two-tier-flask-app.git'
             }
         }
@@ -22,6 +23,7 @@ pipeline {
         stage('Build & Push Docker Image') {
             steps {
                 withAWS(credentials: 'aws-creds', region: "${AWS_REGION}") {
+
                     sh '''
                     echo "🔍 Checking ECR repo..."
                     aws ecr describe-repositories --repository-names $REPO_NAME || \
@@ -35,6 +37,7 @@ pipeline {
                     docker build -t $REPO_NAME .
 
                     IMAGE_TAG=$BUILD_NUMBER
+
                     docker tag $REPO_NAME:latest $ECR_REPO:$IMAGE_TAG
                     docker push $ECR_REPO:$IMAGE_TAG
 
@@ -44,44 +47,64 @@ pipeline {
             }
         }
 
-        stage('Update Kubeconfig') {
+        stage('Update Kubeconfig for Jenkins') {
             steps {
                 withAWS(credentials: 'aws-creds', region: "${AWS_REGION}") {
                     sh '''
-                    echo "⚙️ Updating kubeconfig..."
-                    aws eks update-kubeconfig --region $AWS_REGION --name $CLUSTER
+                    echo "⚙️ Updating kubeconfig for Jenkins user..."
+
+                    # Create Jenkins kube dir
+                    mkdir -p /var/lib/jenkins/.kube
+                    chmod 700 /var/lib/jenkins/.kube
+
+                    # Update kubeconfig
+                    aws eks update-kubeconfig \
+                        --region $AWS_REGION \
+                        --name $CLUSTER \
+                        --kubeconfig /var/lib/jenkins/.kube/config
+
+                    chmod 600 /var/lib/jenkins/.kube/config
                     '''
                 }
             }
         }
 
-        stage('Apply K8s Manifests') {
+        stage('Apply Kubernetes Manifests (MySQL + App + Services)') {
             steps {
-                sh '''
-                echo "📦 Applying Kubernetes YAML files..."
+                withAWS(credentials: 'aws-creds', region: "${AWS_REGION}") {
+                    sh '''
+                    echo "📦 Applying Kubernetes manifests..."
 
-                kubectl apply -f eks-manifests/mysql-configmap.yml
-                kubectl apply -f eks-manifests/mysql-secrets.yml
-                kubectl apply -f eks-manifests/mysql-deployment.yml
-                kubectl apply -f eks-manifests/mysql-svc.yml
+                    export KUBECONFIG=/var/lib/jenkins/.kube/config
 
-                kubectl apply -f eks-manifests/two-tier-app-deployment.yml
-                kubectl apply -f eks-manifests/two-tier-app-svc.yml
-                '''
+                    kubectl apply --validate=false -f eks-manifests/mysql-configmap.yml
+                    kubectl apply --validate=false -f eks-manifests/mysql-secrets.yml
+                    kubectl apply --validate=false -f eks-manifests/mysql-deployment.yml
+                    kubectl apply --validate=false -f eks-manifests/mysql-svc.yml
+
+                    kubectl apply --validate=false -f eks-manifests/two-tier-app-deployment.yml
+                    kubectl apply --validate=false -f eks-manifests/two-tier-app-svc.yml
+                    '''
+                }
             }
         }
 
         stage('Deploy New Image') {
             steps {
-                sh '''
-                IMAGE_TAG=$(cat image.txt)
+                withAWS(credentials: 'aws-creds', region: "${AWS_REGION}") {
 
-                kubectl set image deployment/two-tier-app \
-                two-tier-app=$ECR_REPO:$IMAGE_TAG
+                    sh '''
+                    export KUBECONFIG=/var/lib/jenkins/.kube/config
+                    IMAGE_TAG=$(cat image.txt)
 
-                echo "⏳ Waiting for rollout..."
-                kubectl rollout status deployment/two-tier-app
-                '''
+                    echo "🚀 Deploying new image: $IMAGE_TAG"
+
+                    kubectl set image deployment/$DEPLOYMENT \
+                        two-tier-app=$ECR_REPO:$IMAGE_TAG
+
+                    kubectl rollout status deployment/$DEPLOYMENT
+                    '''
+                }
             }
         }
     }
