@@ -6,7 +6,7 @@ pipeline {
         AWS_ACCOUNT = "883391054308"
         REPO_NAME = "two-tier-flask-app"
         ECR_REPO = "${AWS_ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com/${REPO_NAME}"
-        CLUSTER = "devops-eks-demo"
+        CLUSTER = "abhi-eks-eC8jy4sj"   // FIXED HERE
         DEPLOYMENT = "two-tier-app"
     }
 
@@ -52,10 +52,11 @@ pipeline {
 
                     IMAGE_TAG=$(cat image.txt)
 
-                    echo "Updating deployment..."
-                    kubectl set image deployment/$DEPLOYMENT two-tier-app=$ECR_REPO:$IMAGE_TAG --record
+                    echo "Updating deployment image..."
+                    kubectl set image deployment/$DEPLOYMENT \
+                        two-tier-app=$ECR_REPO:$IMAGE_TAG
 
-                    echo "Checking rollout..."
+                    echo "Waiting for rollout..."
                     kubectl rollout status deployment/$DEPLOYMENT
                     '''
                 }
