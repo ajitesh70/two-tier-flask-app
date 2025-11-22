@@ -6,7 +6,7 @@ pipeline {
         AWS_ACCOUNT  = "883391054308"
         REPO_NAME    = "two-tier-flask-app"
         ECR_REPO     = "${AWS_ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com/${REPO_NAME}"
-        CLUSTER      = "my-eks"
+        CLUSTER      = "my-eks-2"
         DEPLOYMENT   = "two-tier-app"
     }
 
