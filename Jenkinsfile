@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         AWS_REGION   = "ap-south-1"
-        AWS_ACCOUNT  = "883391054308"
+        AWS_ACCOUNT  = "150292693201"   // Your AWS account ID (Corrected)
         REPO_NAME    = "two-tier-flask-app"
         ECR_REPO     = "${AWS_ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com/${REPO_NAME}"
         CLUSTER      = "my-eks-2"
@@ -23,7 +23,6 @@ pipeline {
         stage('Build & Push Docker Image') {
             steps {
                 withAWS(credentials: 'aws-creds', region: "${AWS_REGION}") {
-
                     sh '''
                     echo "🔍 Checking ECR repo..."
                     aws ecr describe-repositories --repository-names $REPO_NAME || \
@@ -53,11 +52,9 @@ pipeline {
                     sh '''
                     echo "⚙️ Updating kubeconfig for Jenkins user..."
 
-                    # Create Jenkins kube dir
                     mkdir -p /var/lib/jenkins/.kube
                     chmod 700 /var/lib/jenkins/.kube
 
-                    # Update kubeconfig
                     aws eks update-kubeconfig \
                         --region $AWS_REGION \
                         --name $CLUSTER \
@@ -74,7 +71,6 @@ pipeline {
                 withAWS(credentials: 'aws-creds', region: "${AWS_REGION}") {
                     sh '''
                     echo "📦 Applying Kubernetes manifests..."
-
                     export KUBECONFIG=/var/lib/jenkins/.kube/config
 
                     kubectl apply --validate=false -f eks-manifests/mysql-configmap.yml
@@ -92,16 +88,12 @@ pipeline {
         stage('Deploy New Image') {
             steps {
                 withAWS(credentials: 'aws-creds', region: "${AWS_REGION}") {
-
                     sh '''
                     export KUBECONFIG=/var/lib/jenkins/.kube/config
                     IMAGE_TAG=$(cat image.txt)
 
                     echo "🚀 Deploying new image: $IMAGE_TAG"
-
-                    kubectl set image deployment/$DEPLOYMENT \
-                        two-tier-app=$ECR_REPO:$IMAGE_TAG
-
+                    kubectl set image deployment/$DEPLOYMENT two-tier-app=$ECR_REPO:$IMAGE_TAG
                     kubectl rollout status deployment/$DEPLOYMENT
                     '''
                 }
